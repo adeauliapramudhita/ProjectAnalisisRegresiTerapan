@@ -1,0 +1,125 @@
+library(readxl)
+data <- read_excel("C:/Users/Hp/Downloads/DATASET PROJECT ART.xlsx")
+View(data)
+
+# Variabel Independen
+Y = data$Manufacturing.Value.Added
+# Variabel Dependen
+X = data[, -c(1,2)] # Ambil data frame selain Manufacturing Value Added
+
+
+# Asumsi Linearitas
+pairs(data[,-1], main = "Matriks Scatterplot Data Manifactur", pch = 19)
+## Metode ggplot2 dan GGally
+library(ggplot2) 
+library(GGally)
+ggpairs(data[,-1], title = "Matriks Scatterplot Data Manifactur", 
+        axisLabels = "show")
+cor(data[,-1], method = "pearson")
+
+R2 = c()
+
+# Membuat Dataframe R-Squared
+X_num = X
+R2 = data.frame(matrix(ncol = ncol(X_num), nrow = 1))
+colnames(R2) = colnames(X_num)
+for (i in 1:ncol(X_num)){
+  R2[i] = summary(lm(y ~ X_num[,i]))$r.squared
+}
+print(R2)
+
+# Model Criterion Function
+library(olsrr)
+model_criterion <- function(data, model){
+  rss <- sum(model$residuals^2)
+  n <- nrow(data)
+  k <- length(coef(model))
+  sigma2_hat <- rss/(n - k)
+  # Menghitung kriteria pemilihan model terbaik
+  aic <- n*log(rss/n) + 2*k
+  sbc <- n*log(rss/n) + k*log(n)
+  cp <- (rss/sigma2_hat) - n + 2*k
+  press <- ols_press(model)
+  r <- sqrt(summary(model)$r.square)
+  r.square <- summary(model)$r.square
+  adj.r.square <- summary(model)$adj.r.square
+  se <- summary(model)$sigma
+  # Membuat data frame hasil kriteria model
+  result <- data.frame(R=r, R.Square=r.square, "Adj.RSquare"=adj.r.square,"Residual Standard Error"=se ,AIC=aic, SBC=sbc, CP_Mallows=cp, PRESS=press)
+  print("Model Criterion for Model:")
+  return(result)
+}
+
+# Pembantukan Model
+df_modelling <- data[,-c(1,2)]
+
+# Model I
+model1 = lm(Y ~ ., data = df_modelling)
+summary(model1)
+sqrt(summary(model1)$r.squared)
+model_criterion(df_modelling,model1)
+
+# Model II
+# Drop Rings Column
+library(dplyr)
+df_modelling <- select(df_modelling, -Harga.Minyak.Mentah.Dunia)
+model2 = lm(Y ~ ., data = df_modelling)
+summary(model2)
+sqrt(summary(model2)$r.squared)
+model_criterion(df_modelling,model2)
+
+# Model III
+# Drop Length Column
+df_modelling <- select(df_modelling, -Nilai.Impor.Minyak.Mentah   )
+model3 = lm(Y ~ ., data = df_modelling)
+summary(model3)
+sqrt(summary(model3)$r.squared)
+model_criterion(df_modelling,model3)
+
+# Overall Test
+overall_p <- function(my_model) {
+  f <- summary(my_model)$fstatistic
+  p <- pf(f[1],f[2],f[3],lower.tail=F)
+  attributes(p) <- NULL
+  return(p)
+}
+
+overall_test = data.frame(matrix(ncol = 2, nrow = 3))
+colnames(overall_test) = c("Model", "Overall Test's P-Value")
+overall_test$Model = c("Model 1", "Model 2", "Model 3")
+overall_test$P.Value = c(overall_p(model1),
+                         overall_p(model2),
+                         overall_p(model3))
+print(overall_test[,-2])
+
+
+# Uji Parsial untuk Konstanta
+intercept_p <- function(my_model) {
+  p <- summary(my_model)$coefficients[1,4]
+  return(p)
+}
+partial_test = data.frame(matrix(ncol = 2, nrow = 3))
+colnames(partial_test) = c("Model", "Intercept's P-Value")
+partial_test$Model = c("Model 1", "Model 2", "Model 3")
+partial_test$P.Value = c(intercept_p(model1),
+                         intercept_p(model2),
+                         intercept_p(model3))
+print(partial_test[,-2])
+
+# Uji Parsial untuk Koefisien
+coef_p <- function(my_model) {
+  p <- summary(my_model)$coefficients[-1,4]
+  return(round(p, 3))
+}
+coef_p(model1)
+coef_p(model2)
+coef_p(model3)
+
+# Model Regresi Terbentuk
+est_coef <- function(my_model) {
+  coef <- summary(my_model)$coefficients[,1]
+  return(round(coef, 3))
+}
+est_coef(model1)
+est_coef(model2)
+est_coef(model3)
